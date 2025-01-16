@@ -8,10 +8,10 @@ node_modules/
 .env.local
 .env.*.local
 
-# Build outputs
-/build
+# Build output
 /dist
-/coverage
+/build
+/out
 
 # Logs
 logs
@@ -20,26 +20,35 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Editor directories and files
-.idea/
-.vscode/
-*.swp
-*.swo
-.DS_Store
-*.pem
-
 # Testing
 /coverage
 .nyc_output
 
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 
-# Dependency directories
-bower_components/
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
 
 # Optional npm cache directory
 .npm
@@ -56,16 +65,15 @@ bower_components/
 # Yarn Integrity file
 .yarn-integrity
 
-# TypeScript cache
-*.tsbuildinfo
+# dotenv environment variable files
+.env
+.env.test
+.env.production
 
-# Next.js build output
-.next
-out
+# Temporary files
+*.swp
+*.swo
+*~
 
-# Production
-/build
-
-# Misc
-.DS_Store
-*.pem
+# MongoDB data directory
+/data/db
