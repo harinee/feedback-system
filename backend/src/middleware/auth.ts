@@ -1,172 +1,151 @@
 import { Request, Response, NextFunction } from 'express';
-import { oktaJwtVerifier, hasPermission, isRouteAllowed, getCachedUserRole, cacheUserRole } from '../config/auth';
+import OktaJwtVerifier = require('@okta/jwt-verifier');
 import { User, UserRole } from '../models/User';
-import { Feedback } from '../models/Feedback';
-import { logger } from '../utils/logger';
 
-// Extend Express Request type to include user information
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: string;
-        email: string;
-        role: string;
-        oktaId: string;
-      };
-    }
+const oktaJwtVerifier = new OktaJwtVerifier({
+  issuer: process.env.OKTA_ISSUER!,
+  clientId: process.env.OKTA_CLIENT_ID!
+});
+
+interface OktaClaims extends OktaJwtVerifier.JwtClaims {
+  email: string;
+  groups?: string[];
+}
+
+// Error class for authentication/authorization failures
+export class AuthError extends Error {
+  constructor(message: string, public statusCode: number = 401) {
+    super(message);
+    this.name = 'AuthError';
   }
 }
 
-// Middleware to verify Okta JWT token
-export const authenticateJWT = async (req: Request, res: Response, next: NextFunction) => {
+// Middleware to verify JWT token
+export const authenticateJWT = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const authHeader = req.headers.authorization;
-    
     if (!authHeader) {
-      return res.status(401).json({ error: 'Authorization header missing' });
+      throw new AuthError('No authorization header');
     }
 
     const match = authHeader.match(/^Bearer (.+)$/);
     if (!match) {
-      return res.status(401).json({ error: 'Invalid authorization header format' });
+      throw new AuthError('Invalid authorization header format');
     }
 
-    try {
-      const jwt = match[1];
-      const { claims } = await oktaJwtVerifier.verifyAccessToken(jwt, 'api://default');
-      
-      // Get user from database or create if first time
-      const oktaId = claims.sub;
-      let user = await User.findOne({ oktaId });
-      
-      if (!user) {
-        // For first-time users, create account with default employee role
-        user = await User.create({
-          oktaId,
-          email: claims.email,
-          firstName: claims.given_name,
-          lastName: claims.family_name,
-          role: UserRole.EMPLOYEE
-        });
-        logger.info(`Created new user account for ${claims.email}`);
+    const token = match[1];
+    const { claims } = await oktaJwtVerifier.verifyAccessToken(token, 'api://default');
+    const oktaClaims = claims as unknown as OktaClaims;
+
+    if (!oktaClaims.email) {
+      throw new AuthError('Email claim missing from token');
+    }
+
+    // Find or create user
+    let user = await User.findOne({ oktaId: oktaClaims.sub });
+    if (!user) {
+      // Determine role from Okta groups
+      let role = UserRole.Employee; // Default role
+      if (oktaClaims.groups) {
+        if (oktaClaims.groups.includes('Admin')) {
+          role = UserRole.Admin;
+        } else if (oktaClaims.groups.includes('Leader')) {
+          role = UserRole.Leader;
+        }
       }
 
-      // Cache the user's role
-      cacheUserRole(user.id, user.role);
-
-      // Add user info to request
-      req.user = {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        oktaId: user.oktaId
-      };
-
-      next();
-    } catch (err) {
-      logger.error('Token validation failed:', err);
-      return res.status(401).json({ error: 'Invalid or expired token' });
-    }
-  } catch (error) {
-    logger.error('Authentication error:', error);
-    return res.status(500).json({ error: 'Internal server error during authentication' });
-  }
-};
-
-// Middleware to handle anonymous access
-export const optionalAuth = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader) {
-      // Allow anonymous access
-      return next();
+      user = await User.create({
+        email: oktaClaims.email,
+        oktaId: oktaClaims.sub,
+        role
+      });
     }
 
-    // If authorization header exists, verify it
-    return authenticateJWT(req, res, next);
-  } catch (error) {
-    logger.error('Optional authentication error:', error);
-    return res.status(500).json({ error: 'Internal server error during authentication' });
-  }
-};
-
-// Middleware to check role-based permissions
-export const requirePermission = (permission: string) => {
-  return async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
-
-      const userRole = getCachedUserRole(req.user.id) || req.user.role;
-
-      if (!hasPermission(userRole, permission)) {
-        logger.warn(`Permission denied: ${req.user.email} attempted to access ${permission}`);
-        return res.status(403).json({ error: 'Insufficient permissions' });
-      }
-
-      next();
-    } catch (error) {
-      logger.error('Permission check error:', error);
-      return res.status(500).json({ error: 'Internal server error during permission check' });
-    }
-  };
-};
-
-// Middleware to check route access based on role
-export const requireRouteAccess = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    const userRole = getCachedUserRole(req.user.id) || req.user.role;
-
-    if (!isRouteAllowed(userRole, req.path)) {
-      logger.warn(`Route access denied: ${req.user.email} attempted to access ${req.path}`);
-      return res.status(403).json({ error: 'Route access denied' });
-    }
+    // Attach user to request
+    req.user = {
+      id: user._id.toString(),
+      email: user.email,
+      role: user.role,
+      oktaId: user.oktaId
+    };
 
     next();
   } catch (error) {
-    logger.error('Route access check error:', error);
-    return res.status(500).json({ error: 'Internal server error during route access check' });
+    if (error instanceof AuthError) {
+      next(error);
+    } else {
+      next(new AuthError('Authentication failed'));
+    }
   }
 };
 
-// Middleware to ensure user can only access their own resources
-export const requireOwnership = (resourceField: string) => {
-  return async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
+// Optional authentication middleware
+export const optionalAuth = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    await authenticateJWT(req, res, next);
+  } catch {
+    // Continue without authentication
+    next();
+  }
+};
 
-      const resourceId = req.params[resourceField];
-      const userRole = getCachedUserRole(req.user.id) || req.user.role;
+// Permission checking middleware factory
+export const requirePermission = (permission: string) => {
+  const permissionMap = {
+    'view:feedback': [UserRole.Admin, UserRole.Leader],
+    'view:own-feedback': [UserRole.Employee],
+    'manage:feedback': [UserRole.Leader],
+    'delete:own-feedback': [UserRole.Employee],
+    'respond:feedback': [UserRole.Leader],
+    'view:metrics': [UserRole.Admin, UserRole.Leader]
+  };
 
-      // Admins and leaders can access all resources
-      if ([UserRole.ADMIN, UserRole.LEADER].includes(userRole as UserRole)) {
-        return next();
-      }
-
-      // For employees, check resource ownership
-      const resource = await Feedback.findById(resourceId);
-      if (!resource) {
-        return res.status(404).json({ error: 'Resource not found' });
-      }
-
-      if (resource.submitter?.toString() !== req.user.id && !resource.isAnonymous) {
-        logger.warn(`Ownership check failed: ${req.user.email} attempted to access resource ${resourceId}`);
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
-      next();
-    } catch (error) {
-      logger.error('Ownership check error:', error);
-      return res.status(500).json({ error: 'Internal server error during ownership check' });
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return next(new AuthError('Authentication required'));
     }
+
+    const allowedRoles = permissionMap[permission as keyof typeof permissionMap];
+    if (!allowedRoles) {
+      return next(new AuthError('Invalid permission'));
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      return next(new AuthError('Insufficient permissions', 403));
+    }
+
+    next();
+  };
+};
+
+// Resource ownership checking middleware factory
+export const requireOwnership = (idParam: string) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return next(new AuthError('Authentication required'));
+    }
+
+    const resourceId = req.params[idParam];
+    if (!resourceId) {
+      return next(new AuthError('Resource ID not provided'));
+    }
+
+    // For Employee role, check if they own the resource
+    if (req.user.role === UserRole.Employee) {
+      const feedback = await User.findById(resourceId);
+      if (!feedback || feedback.oktaId !== req.user.oktaId) {
+        return next(new AuthError('Not authorized to access this resource', 403));
+      }
+    }
+
+    next();
   };
 };
