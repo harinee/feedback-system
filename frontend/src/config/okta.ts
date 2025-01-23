@@ -1,15 +1,28 @@
-import { OktaAuth } from '@okta/okta-auth-js';
-
-const oktaAuth = new OktaAuth({
-  issuer: import.meta.env.VITE_OKTA_ISSUER,
-  clientId: import.meta.env.VITE_OKTA_CLIENT_ID,
+// Mock Okta configuration for development
+const oktaAuth = {
+  issuer: 'https://dev-mock.okta.com/oauth2/default',
+  clientId: 'mock-client-id',
   redirectUri: window.location.origin + '/login/callback',
   scopes: ['openid', 'profile', 'email'],
-  pkce: true
-});
+  pkce: true,
+  disableHttpsCheck: process.env.NODE_ENV === 'development'
+};
+
+// Mock authentication functions
+const mockAuth = {
+  isAuthenticated: true,
+  getUser: () => ({
+    email: 'employee@example.com',
+    role: 'employee',
+    sub: 'mock-employee'
+  }),
+  signInWithRedirect: () => Promise.resolve(),
+  handleLoginRedirect: () => Promise.resolve(),
+  signOut: () => Promise.resolve()
+};
 
 export const oktaConfig = {
-  oktaAuth,
+  oktaAuth: process.env.NODE_ENV === 'development' ? mockAuth : oktaAuth,
   onAuthRequired: () => {
     window.location.pathname = '/login';
   },
