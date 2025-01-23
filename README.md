@@ -6,7 +6,10 @@ A secure feedback system that allows employees to submit feedback to leadership 
 
 ### Completed Features
 - Basic project structure (frontend/backend)
-- Development authentication system
+- Authentication system:
+  - Okta integration structure
+  - Development mode with mock authentication
+  - Production-ready Okta configuration
 - Role-based access control structure
 - Basic frontend components:
   - Dashboard view
@@ -18,7 +21,6 @@ A secure feedback system that allows employees to submit feedback to leadership 
 - TypeScript integration
 
 ### In Development
-- Okta authentication integration
 - Feedback management features
 - Dashboard analytics
 - Testing implementation
@@ -29,6 +31,7 @@ A secure feedback system that allows employees to submit feedback to leadership 
 - Node.js >= 16.0.0
 - MongoDB >= 5.0
 - npm or yarn
+- Okta account (for production)
 
 ### Getting Started
 
@@ -60,7 +63,20 @@ cd ../frontend
 cp .env.example .env
 ```
 
-4. Start development servers
+4. Configure Authentication
+- Development: Uses mock authentication by default
+- Production: Update .env files with your Okta credentials:
+  ```
+  # Backend .env
+  OKTA_ISSUER=https://your-domain.okta.com/oauth2/default
+  OKTA_CLIENT_ID=your-client-id
+
+  # Frontend .env
+  VITE_OKTA_ISSUER=https://your-domain.okta.com/oauth2/default
+  VITE_OKTA_CLIENT_ID=your-client-id
+  ```
+
+5. Start development servers
 ```bash
 # Start backend (from backend directory)
 npm run dev
@@ -69,16 +85,16 @@ npm run dev
 npm run dev
 ```
 
-### Development Authentication
+### Authentication Modes
 
-The system currently uses mock authentication for development:
+#### Development Mode
+The system uses mock authentication with predefined users:
+- Employee: employee@example.com
+- Leader: leader@example.com
+- Admin: admin@example.com
 
-- Available mock users:
-  - Employee: employee@example.com
-  - Leader: leader@example.com
-  - Admin: admin@example.com
-
-Authentication is automatically bypassed in development mode for easier testing.
+#### Production Mode
+Uses Okta authentication when proper credentials are configured in environment variables.
 
 ## Project Structure
 
