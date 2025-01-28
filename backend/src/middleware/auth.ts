@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 
 // Mock user roles for development
-const MOCK_USERS = {
+const MOCK_USERS: Record<string, { id: string; email: string; role: string }> = {
   'mock-employee': { id: 'mock-employee', email: 'employee@example.com', role: 'employee' },
   'mock-leader': { id: 'mock-leader', email: 'leader@example.com', role: 'leader' },
   'mock-admin': { id: 'mock-admin', email: 'admin@example.com', role: 'admin' }

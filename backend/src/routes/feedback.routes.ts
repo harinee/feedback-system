@@ -2,7 +2,7 @@ import express from 'express';
 import { authenticate, authorize } from '../middleware/auth';
 import {
   createFeedback,
-  getFeedback,
+  getAllFeedback,
   getFeedbackById,
   updateFeedbackStatus,
   deleteFeedback
@@ -14,7 +14,7 @@ const router = express.Router();
 router.post('/', authenticate, createFeedback);
 
 // Get all feedback (with optional filters)
-router.get('/', authenticate, getFeedback);
+router.get('/', authenticate, getAllFeedback);
 
 // Get specific feedback by ID
 router.get('/:id', authenticate, getFeedbackById);
