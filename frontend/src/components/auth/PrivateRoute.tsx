@@ -1,37 +1,34 @@
-import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
-import { Box, CircularProgress } from '@mui/material';
+import { Outlet } from 'react-router-dom';
 
-// For development, we'll always be authenticated
-const isDevelopment = process.env.NODE_ENV === 'development';
+// Simple development-mode route guard
+// TODO: Implement proper authentication in production
+// Keeping Okta implementation commented for future use:
+/*
+import { Navigate } from 'react-router-dom';
+import { Box, CircularProgress } from '@mui/material';
+import { useOktaAuth } from '@okta/okta-react';
 
 const PrivateRoute: React.FC = () => {
-  // In development, skip authentication checks
-  if (isDevelopment) {
-    return <Outlet />;
-  }
-
-  // TODO: Replace with actual Okta authentication in production
-  const isAuthenticated = true;
-  const isLoading = false;
-
-  if (isLoading) {
+  const { authState } = useOktaAuth();
+  
+  if (authState?.isLoading) {
     return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="100vh"
-      >
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
         <CircularProgress />
       </Box>
     );
   }
 
-  if (!isAuthenticated) {
+  if (!authState?.isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
+  return <Outlet />;
+};
+*/
+
+const PrivateRoute = () => {
+  // Always allow access in development
   return <Outlet />;
 };
 

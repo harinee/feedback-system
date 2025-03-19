@@ -2,46 +2,59 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
+// Enable more verbose logging
+console.log('Loading Vite configuration');
+
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-      '@components': path.resolve(__dirname, './src/components'),
-      '@pages': path.resolve(__dirname, './src/pages'),
-      '@hooks': path.resolve(__dirname, './src/hooks'),
-      '@services': path.resolve(__dirname, './src/services'),
-      '@utils': path.resolve(__dirname, './src/utils'),
-      '@types': path.resolve(__dirname, './src/types'),
-      '@contexts': path.resolve(__dirname, './src/contexts'),
-      '@assets': path.resolve(__dirname, './src/assets')
+  logLevel: 'info',
+  clearScreen: false,
+  plugins: [
+    react(),
+    // Using a simple history fallback plugin
+    {
+      name: 'spa-history-fallback',
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          // Skip if the request is for a file (has extension)
+          if (req.url && req.url.includes('.')) {
+            return next();
+          }
+          
+          // For all other requests, serve index.html
+          req.url = '/';
+          next();
+        });
+      }
     }
-  },
+  ],
   server: {
     port: 3000,
+    hmr: { overlay: true },
+    watch: {
+      usePolling: true,
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,
-        secure: false
+        secure: false,
+        configure: (proxy, options) => {
+          proxy.on('error', (err, req, res) => {
+            console.log('Proxy error:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            console.log('Proxying request:', req.method, req.url, '→', options.target + req.url);
+          });
+          proxy.on('proxyRes', (proxyRes, req, res) => {
+            console.log('Proxy response:', proxyRes.statusCode, req.url);
+          });
+        }
       }
     }
   },
   build: {
     outDir: 'build',
     sourcemap: true
-  },
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: './src/test/setup.ts',
-    coverage: {
-      reporter: ['text', 'json', 'html'],
-      exclude: [
-        'node_modules/',
-        'src/test/',
-      ]
-    }
   }
 });

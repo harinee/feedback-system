@@ -1,4 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+
+interface Feedback {
+  _id: string;
+  content: string;
+  isAnonymous: boolean;
+  submitter?: string;
+  status: 'New' | 'In Action' | 'Hold' | 'Closed';
+  createdAt: string;
+  updatedAt: string;
+}
 import {
   Box,
   Button,
@@ -16,6 +26,27 @@ import {
 const FeedbackList: React.FC = () => {
   const [content, setContent] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
+  const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
+
+  const fetchFeedback = async () => {
+    try {
+      const response = await fetch('/api/feedback', {
+        headers: {
+          'x-mock-user': 'mock-employee'
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setFeedbackList(data);
+      }
+    } catch (error) {
+      console.error('Error fetching feedback:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchFeedback();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,24 +55,19 @@ const FeedbackList: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-mock-user': 'mock-employee'
         },
         body: JSON.stringify({ content, isAnonymous }),
       });
       if (response.ok) {
         setContent('');
         setIsAnonymous(false);
-        // In a real app, we would refresh the feedback list here
+        fetchFeedback(); // Refresh the feedback list after submission
       }
     } catch (error) {
       console.error('Error submitting feedback:', error);
     }
   };
-
-  // Dummy data for demonstration
-  const feedbackList = [
-    { id: 1, content: 'Sample feedback 1', status: 'New' },
-    { id: 2, content: 'Sample feedback 2', status: 'In Action' },
-  ];
 
   return (
     <Box>
@@ -82,7 +108,7 @@ const FeedbackList: React.FC = () => {
       <Paper>
         <List>
           {feedbackList.map((feedback, index) => (
-            <React.Fragment key={feedback.id}>
+            <React.Fragment key={feedback._id}>
               {index > 0 && <Divider />}
               <ListItem>
                 <ListItemText

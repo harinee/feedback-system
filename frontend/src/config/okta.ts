@@ -5,7 +5,7 @@ const oktaAuth = {
   redirectUri: window.location.origin + '/login/callback',
   scopes: ['openid', 'profile', 'email'],
   pkce: true,
-  disableHttpsCheck: process.env.NODE_ENV === 'development'
+  disableHttpsCheck: import.meta.env.VITE_NODE_ENV === 'development'
 };
 
 // Mock authentication functions
@@ -22,7 +22,7 @@ const mockAuth = {
 };
 
 export const oktaConfig = {
-  oktaAuth: process.env.NODE_ENV === 'development' ? mockAuth : oktaAuth,
+  oktaAuth: import.meta.env.VITE_NODE_ENV === 'development' ? mockAuth : oktaAuth,
   onAuthRequired: () => {
     window.location.pathname = '/login';
   },
