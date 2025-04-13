@@ -7,20 +7,24 @@ A secure feedback system that allows employees to submit feedback to leadership 
 ### Completed Features
 - Basic project structure (frontend/backend)
 - Authentication system:
-  - Okta integration structure
-  - Development mode with mock authentication
-  - Production-ready Okta configuration
-- Role-based access control structure
-- Basic frontend components:
+  - Mock authentication for development
+  - Okta integration structure (prepared but not fully implemented)
+- Role-based access control structure with three roles:
+  - Employee: Can submit and view own feedback
+  - Leader: Can view and manage feedback
+  - Admin: Full system access
+- Basic frontend components built with React and Material UI:
   - Dashboard view
   - Feedback submission
   - Feedback listing
   - Feedback details
-- Backend API structure
+- Backend API structure for feedback management
 - Environment configuration
 - TypeScript integration
+- Vite build system for frontend
 
 ### In Development
+- Full Okta authentication implementation
 - Feedback management features
 - Dashboard analytics
 - Testing implementation
@@ -63,18 +67,49 @@ cd ../frontend
 cp .env.example .env
 ```
 
-4. Configure Authentication
-- Development: Uses mock authentication by default
-- Production: Update .env files with your Okta credentials:
-  ```
-  # Backend .env
-  OKTA_ISSUER=https://your-domain.okta.com/oauth2/default
-  OKTA_CLIENT_ID=your-client-id
+4. Configure Environment Variables
 
-  # Frontend .env
-  VITE_OKTA_ISSUER=https://your-domain.okta.com/oauth2/default
-  VITE_OKTA_CLIENT_ID=your-client-id
-  ```
+#### Backend (.env)
+```
+# Node Environment
+NODE_ENV=development
+PORT=3001
+
+# MongoDB Configuration
+MONGODB_URI=mongodb://localhost:27017/feedback-system
+MONGODB_POOL_SIZE=10
+MONGODB_MAX_IDLE_TIME_MS=30000
+
+# CORS Configuration
+CORS_ORIGIN=http://localhost:3000
+
+# Okta Configuration (for production)
+OKTA_ISSUER=https://your-okta-domain/oauth2/default
+OKTA_CLIENT_ID=your-client-id
+
+# Rate Limiting
+RATE_LIMIT_WINDOW_MS=900000  # 15 minutes
+RATE_LIMIT_MAX=100
+
+# Logging
+LOG_LEVEL=info
+
+# JWT Configuration
+JWT_EXPIRY=1h
+```
+
+#### Frontend (.env)
+```
+# Okta Configuration (for production)
+VITE_OKTA_ISSUER=https://your-okta-domain/oauth2/default
+VITE_OKTA_CLIENT_ID=your-client-id
+
+# API Configuration
+VITE_API_URL=http://localhost:3001/api
+
+# Environment
+VITE_NODE_ENV=development
+```
 
 5. Start development servers
 ```bash
@@ -89,12 +124,22 @@ npm run dev
 
 #### Development Mode
 The system uses mock authentication with predefined users:
-- Employee: employee@example.com
-- Leader: leader@example.com
-- Admin: admin@example.com
+- Employee: employee@example.com (role: employee)
+- Leader: leader@example.com (role: leader)
+- Admin: admin@example.com (role: admin)
+
+When testing the API directly, you can use the `x-mock-user` header with one of these values:
+- `mock-employee` - For employee access
+- `mock-leader` - For leader access
+- `mock-admin` - For admin access
+
+Example:
+```bash
+curl -H "x-mock-user: mock-leader" http://localhost:3001/api/feedback
+```
 
 #### Production Mode
-Uses Okta authentication when proper credentials are configured in environment variables.
+Uses Okta authentication when proper credentials are configured in environment variables. Note that the Okta implementation is currently prepared but commented out in the codebase for future use.
 
 ## Project Structure
 
@@ -106,14 +151,17 @@ feedback-system/
 │   │   ├── middleware/     # Express middleware
 │   │   ├── models/         # MongoDB models
 │   │   ├── routes/         # API routes
-│   │   └── types/          # TypeScript types
+│   │   ├── types/          # TypeScript types
+│   │   ├── utils/          # Utility functions
+│   │   └── config/         # Configuration files
 │   └── tests/              # Backend tests
 └── frontend/
     ├── src/
     │   ├── components/     # React components
     │   ├── pages/          # Page components
     │   ├── config/         # Configuration
-    │   └── types/          # TypeScript types
+    │   ├── types/          # TypeScript types
+    │   └── theme.ts        # Material UI theme
     └── public/             # Static files
 ```
 
@@ -125,12 +173,43 @@ feedback-system/
 - `npm start`: Start production server
 - `npm test`: Run tests
 
-### Frontend
+### Frontend (Vite)
 - `npm run dev`: Start development server
 - `npm run build`: Build for production
-- `npm run serve`: Preview production build
+- `npm run preview`: Preview production build
 - `npm run lint`: Run linter
 - `npm run format`: Format code
+
+## Feedback Model
+
+The system uses the following model for feedback:
+
+- `content`: The feedback text content
+- `isAnonymous`: Boolean flag indicating if the feedback is anonymous
+- `submitter`: Reference to the user who submitted the feedback (omitted for anonymous feedback)
+- `status`: Current status of the feedback, one of:
+  - `New`: Newly submitted feedback
+  - `In Action`: Feedback being addressed
+  - `Hold`: Feedback on hold
+  - `Closed`: Feedback resolved or closed
+
+## API Endpoints
+
+### Feedback Endpoints
+
+- `GET /api/feedback`: Get all feedback (requires leader or admin role)
+- `POST /api/feedback`: Submit new feedback (all authenticated users)
+- `GET /api/feedback/:id`: Get specific feedback by ID
+- `PUT /api/feedback/:id`: Update feedback status (requires leader or admin role)
+- `DELETE /api/feedback/:id`: Delete feedback (requires admin role)
+
+## Static File Serving
+
+The backend is configured to serve static files from:
+- `frontend/public` directory during development
+- `frontend/build` directory in production (if it exists)
+
+This allows the application to be deployed as a single unit.
 
 ## Contributing
 
